@@ -1,0 +1,79 @@
+
+stages:
+  - validate
+  - scan
+  - plan
+  - apply
+
+variables:
+  TF_VERSION: "1.7.0"
+  TF_ROOT: "${CI_PROJECT_DIR}"
+
+cache:
+  paths:
+    - .terraform/
+
+before_script:
+  - cd "${TF_ROOT}"
+  - terraform --version
+
+validate:
+  stage: validate
+  script:
+    - echo "Running Terraform format check..."
+    - terraform fmt -check -recursive .
+    - echo "Running Terraform validation..."
+    - terraform validate
+  except:
+    - schedules
+  allow_failure: false
+
+scan:
+  stage: scan
+  image: aquasec/tfsec:latest
+  script:
+    - echo "Running security scan with tfsec..."
+    - tfsec . --format sarif --out tfsec-results.sarif --exit-code 1 || true
+  artifacts:
+    reports:
+      sast: tfsec-results.sarif
+    expire_in: 1 week
+  except:
+    - schedules
+  allow_failure: true
+
+plan:
+  stage: plan
+  script:
+    - echo "Planning infrastructure changes..."
+    - cd projects/${PROJECT_NAME}/${ENVIRONMENT}
+    - terraform init -backend-config=../../backend-config/${ENVIRONMENT}.hcl
+    - terraform plan -out=tfplan
+    - terraform show tfplan > plan.txt
+  artifacts:
+    paths:
+      - projects/*/*/tfplan
+      - projects/*/*/plan.txt
+    expire_in: 1 week
+  only:
+    - merge_requests
+  except:
+    - schedules
+
+apply:
+  stage: apply
+  script:
+    - echo "Applying infrastructure changes..."
+    - cd projects/${PROJECT_NAME}/${ENVIRONMENT}
+    - terraform init -backend-config=../../backend-config/${ENVIRONMENT}.hcl
+    - terraform apply -auto-approve tfplan
+  artifacts:
+    paths:
+      - projects/*/*/tfplan
+    expire_in: 1 week
+  only:
+    - main
+  when: manual
+  except:
+    - schedules
+

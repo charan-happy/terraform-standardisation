@@ -1,0 +1,20 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+tfplan
+
+# Variable files with potential secrets
+terraform.tfvars
+*.auto.tfvars
+
+# Private keys (NEVER COMMIT!)
+keys/
+*.pem
+*.key
+
+# Logs
+*.log
+crash.log

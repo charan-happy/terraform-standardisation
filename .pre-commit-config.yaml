@@ -1,0 +1,67 @@
+
+repos:
+  # Detect secrets before commit
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--allow-verified-specs']
+        exclude: '(.*\.tfvars\.example|.*example\.tfvars)'
+
+  # Terraform formatting and validation
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.86.0
+    hooks:
+      - id: terraform_fmt
+        args: [--args=-recursive]
+      - id: terraform_validate
+      - id: terraform_docs
+        args:
+          - --hook-config=--path-type=relative
+          - --hook-config=--add-to-existing-file=true
+          - --hook-config=--create-file-if-not-exists=true
+  # Update to latest version of pre-commit-terraform for tflint support
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.88.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+      - id: terraform_tflint
+
+  # Security scanning with tfsec
+  - repo: https://github.com/aquasecurity/tfsec
+    rev: v1.28.0
+    hooks:
+      - id: tfsec-docker
+        entry: tfsec
+        language: docker
+        types: [terraform]
+        args:
+          - --minimum-severity
+          - warning
+          - --exit-code
+          - '1'
+        # Skip low-severity checks for faster feedback
+        exclude: |
+          (?x)^(
+            \.terraform/
+          )$
+
+  # General git checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+    for more information, see https://pre-commit.ci
+  autofix_stage: commit
+  skip: [terraform_docs]
+

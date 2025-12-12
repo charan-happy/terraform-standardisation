@@ -1,0 +1,31 @@
+# Bootstrap Configuration Example
+# Copy this to terraform.tfvars and customize
+
+# AWS region where backend resources will be created
+aws_region = "us-east-1"
+
+# Prefix for resource naming (will be combined with account ID)
+project_prefix = "charan"
+
+# Optional: Specify exact bucket name (leave empty for auto-generated)
+# state_bucket_name = "my-terraform-state-bucket"
+
+# Enable state locking with DynamoDB (recommended for teams)
+# Set to false to skip DynamoDB creation (solo dev only)
+enable_state_locking = true
+
+# DynamoDB table name for state locking (if enabled)
+dynamodb_table_name = "terraform-locks"
+
+# EC2 key pairs to create
+key_pair_names = [
+  "project-charan-dev-key",
+  "project-charan-staging-key",
+  "project-charan-prod-key"
+]
+
+# Environments to generate backend configs for
+environments = ["dev", "staging", "prod"]
+
+# Enable access logging for state bucket (creates additional bucket)
+enable_logging = false

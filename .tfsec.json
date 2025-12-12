@@ -1,0 +1,12 @@
+{
+  "minimum_severity": "warning",
+  "exclude": [
+    "AVD-AWS-0001"
+  ],
+  "soft_fail": false,
+  "format": "sarif",
+  "log_level": "info",
+  "checks": [
+    "aws_security_group_allow_all_ingress"
+  ]
+}

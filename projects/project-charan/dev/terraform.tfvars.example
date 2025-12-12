@@ -1,0 +1,43 @@
+
+# This is an EXAMPLE file showing what variables are needed
+# DO NOT COMMIT REAL VALUES TO GIT
+# Use Terraform Cloud to store actual values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Configuration
+environment  = "dev"
+project_name = "project-charan"
+
+# VPC Configuration
+vpc_cidr           = "10.0.0.0/16"
+enable_nat_gateway = false
+
+# Availability zones
+availability_zones    = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs   = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs  = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# Network Security
+admin_cidr = "0.0.0.0/0"  # Restrict this in production
+
+# Database Configuration
+db_instance_class        = "db.t3.micro"
+db_allocated_storage     = 20
+db_name                  = "appdb"
+db_username              = "postgres"  # Username visible is OK
+# db_password            = "CHANGE_ME"  # Set in Terraform Cloud, NOT here
+db_multi_az              = false
+db_backup_retention_days = 7
+db_deletion_protection   = false
+db_skip_final_snapshot   = true
+
+# EC2 Configuration
+web_server_count = 1
+web_instance_type = "t3.micro"
+ec2_key_name = "project-charan-dev-key"  # Ensure this key exists in AWS
+
+
+
+

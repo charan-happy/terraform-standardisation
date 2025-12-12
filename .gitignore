@@ -1,0 +1,57 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+tfplan
+
+# Sensitive files (NEVER COMMIT THESE)
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*example.tfvars
+.env
+.env.local
+secrets/
+.secrets/
+
+# EC2 private keys
+*.pem
+*.key
+bootstrap/keys/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Logs
+*.log
+crash.log
+crash.*.log
+
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Backup files
+*.backup
+*.bak
+
