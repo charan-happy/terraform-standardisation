@@ -1,0 +1,152 @@
+# Creating Multiple EC2 Instances with Different Configurations
+# This file demonstrates three approaches for managing multiple EC2 instances
+
+# Approach 1: Multiple instances with SAME configuration (use count)
+module "web_servers_cluster" {
+  source = "../../../modules/ec2"
+
+  instance_count       = 3  # Creates 3 identical instances
+  instance_type        = "t3.micro"
+  instance_name        = "${var.project_name}-web-cluster"
+  subnet_ids           = module.vpc.public_subnet_ids
+  security_group_id    = module.web_security_group.id
+  key_name             = var.ec2_key_name
+  iam_instance_profile_name = module.ec2_iam_role.instance_profile_name
+
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    db_endpoint = module.rds.endpoint
+    db_name     = var.db_name
+  }))
+
+  tags = merge(local.common_tags, {
+    Purpose = "Web Server Cluster"
+  })
+}
+
+# Approach 2: Multiple instances with SLIGHTLY DIFFERENT configurations (use for_each)
+module "app_servers" {
+  source = "../../../modules/ec2"
+  
+  for_each = {
+    api = {
+      instance_type = "t3.small"
+      subnet_index  = 0
+      tags = {
+        Role = "API Server"
+        Team = "Backend"
+      }
+    }
+    worker = {
+      instance_type = "t3.micro"
+      subnet_index  = 1
+      tags = {
+        Role = "Background Worker"
+        Team = "Backend"
+      }
+    }
+  }
+
+  instance_count       = 1
+  instance_type        = each.value.instance_type
+  instance_name        = "${var.project_name}-${each.key}"
+  subnet_ids           = [module.vpc.public_subnet_ids[each.value.subnet_index]]
+  security_group_id    = module.web_security_group.id
+  key_name             = var.ec2_key_name
+  iam_instance_profile_name = module.ec2_iam_role.instance_profile_name
+
+  tags = merge(local.common_tags, each.value.tags, {
+    CreatedBy = "terraform"
+    CreatedAt = timestamp()
+  })
+}
+
+# Approach 3: Completely DIFFERENT configuration (separate module call)
+module "monitoring_server" {
+  source = "../../../modules/ec2"
+
+  instance_count       = 1
+  instance_type        = "t3.medium"  # Different size
+  instance_name        = "${var.project_name}-monitoring"
+  subnet_ids           = module.vpc.public_subnet_ids
+  security_group_id    = module.monitoring_security_group.id  # Different SG
+  key_name             = var.ec2_key_name
+  iam_instance_profile_name = module.monitoring_iam_role.instance_profile_name  # Different role
+  root_volume_size     = 100  # Larger disk
+
+  # Completely different user data
+  user_data = base64encode(templatefile("${path.module}/monitoring_setup.sh", {
+    grafana_password = var.grafana_password
+  }))
+
+  tags = merge(local.common_tags, {
+    Purpose      = "Monitoring & Observability"
+    Team         = "DevOps"
+    CostCenter   = "Infrastructure"
+    BackupPolicy = "Daily"
+  })
+}
+
+# Security group for monitoring server
+module "monitoring_security_group" {
+  source = "../../../modules/security-groups"
+
+  name        = "${var.project_name}-monitoring-sg"
+  description = "Security group for monitoring server"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = [
+    {
+      from_port   = 3000
+      to_port     = 3000
+      protocol    = "tcp"
+      cidr_ipv4   = "10.0.0.0/16"  # Only from VPC
+      description = "Grafana UI"
+    },
+    {
+      from_port   = 9090
+      to_port     = 9090
+      protocol    = "tcp"
+      cidr_ipv4   = "10.0.0.0/16"
+      description = "Prometheus"
+    }
+  ]
+
+  tags = local.common_tags
+}
+
+# IAM role for monitoring server
+module "monitoring_iam_role" {
+  source = "../../../modules/iam"
+
+  role_name = "${var.project_name}-monitoring-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+  })
+
+  inline_policies = {
+    cloudwatch_read = jsonencode({
+      Version = "2012-10-17"
+      Statement = [{
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "ec2:DescribeInstances",
+          "rds:DescribeDBInstances"
+        ]
+        Resource = "*"
+      }]
+    })
+  }
+
+  create_instance_profile = true
+  tags = local.common_tags
+}
