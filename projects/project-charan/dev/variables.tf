@@ -110,7 +110,7 @@ variable "db_skip_final_snapshot" {
 variable "web_server_count" {
   description = "Number of web servers"
   type        = number
-  default     = 1
+  default     = 2 # 1 for dev but let me try adding 2 
 }
 
 variable "web_instance_type" {

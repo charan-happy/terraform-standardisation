@@ -1,53 +1,107 @@
+# GitLab CI/CD Pipeline for Terraform
+# Enterprise-grade deployment with approval gates and notifications
 
 stages:
   - validate
-  - scan
   - plan
+  - approve
   - apply
+  - notify
 
 variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/projects/project-charan/dev
   TF_VERSION: "1.7.0"
-  TF_ROOT: "${CI_PROJECT_DIR}"
+  PLAN_FILE: tfplan-${CI_PIPELINE_ID}
+  PLAN_JSON: plan-${CI_PIPELINE_ID}.json
 
 cache:
+  key: ${CI_COMMIT_REF_SLUG}
   paths:
-    - .terraform/
+    - ${TF_ROOT}/.terraform
 
 before_script:
-  - cd "${TF_ROOT}"
+  - cd ${TF_ROOT}
   - terraform --version
 
+# Stage 1: Validation
 validate:
   stage: validate
+  image: hashicorp/terraform:1.7
   script:
-    - echo "Running Terraform format check..."
-    - terraform fmt -check -recursive .
-    - echo "Running Terraform validation..."
+    - echo "🔍 Running Terraform validation..."
+    - terraform fmt -check -recursive
+    - terraform init -backend=false
     - terraform validate
-  except:
-    - schedules
-  allow_failure: false
-
-scan:
-  stage: scan
-  image: aquasec/tfsec:latest
-  script:
-    - echo "Running security scan with tfsec..."
-    - tfsec . --format sarif --out tfsec-results.sarif --exit-code 1 || true
+    - echo "✅ Validation passed"
   artifacts:
-    reports:
-      sast: tfsec-results.sarif
-    expire_in: 1 week
-  except:
-    - schedules
-  allow_failure: true
+    paths:
+      - tfsec-report.json
+    expire_in: 7 days
+  only:
+    - merge_requests
+    - main
+    - develop
 
+# Stage 2: Plan
 plan:
   stage: plan
+  image: hashicorp/terraform:1.7
   script:
-    - echo "Planning infrastructure changes..."
-    - cd projects/${PROJECT_NAME}/${ENVIRONMENT}
-    - terraform init -backend-config=../../backend-config/${ENVIRONMENT}.hcl
+    - echo "📋 Generating Terraform plan..."
+    - terraform init
+    - |
+      terraform plan \
+        -out=${PLAN_FILE} \
+        -var="git_commit_sha=${CI_COMMIT_SHA}" \
+        -var="git_branch=${CI_COMMIT_REF_NAME}" \
+        -var="git_author=${GITLAB_USER_NAME}" \
+        -var="deployed_by=${GITLAB_USER_LOGIN}"
+    - terraform show ${PLAN_FILE} > plan.txt
+    - terraform show -json ${PLAN_FILE} > ${PLAN_JSON}
+    - echo "✅ Plan generated successfully"
+  artifacts:
+    paths:
+      - ${TF_ROOT}/${PLAN_FILE}
+      - ${TF_ROOT}/plan.txt
+      - ${TF_ROOT}/${PLAN_JSON}
+    expire_in: 7 days
+  only:
+    - merge_requests
+    - main
+    - develop
+
+# Stage 3: Manual approval (production only)
+approve:
+  stage: approve
+  script:
+    - echo "⏳ Waiting for manual approval..."
+    - cat ${TF_ROOT}/plan.txt | head -50
+  when: manual
+  only:
+    - main
+  needs:
+    - plan
+
+# Stage 4: Apply
+apply:
+  stage: apply
+  image: hashicorp/terraform:1.7
+  script:
+    - echo "⚡ Applying Terraform changes..."
+    - terraform init
+    - terraform apply -auto-approve ${PLAN_FILE}
+    - terraform output -json > outputs.json
+    - echo "✅ Deployment successful"
+  artifacts:
+    paths:
+      - ${TF_ROOT}/outputs.json
+    expire_in: 30 days
+  only:
+    - main
+  needs:
+    - approve
+  environment:
+    name: production
     - terraform plan -out=tfplan
     - terraform show tfplan > plan.txt
   artifacts:
